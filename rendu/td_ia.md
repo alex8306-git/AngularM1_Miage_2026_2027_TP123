@@ -30,8 +30,17 @@
 | `src/main.ts` | fournit ces libellés |
 | `angular.json`, `package.json` | thème Material `azure-blue` + dépendances `@angular/material` et `@angular/cdk` |
 
-`track.service.ts` a été **vérifié sans être modifié** : `list(page, limit)` transmet déjà les
-deux paramètres.
+### TP2 — Mission 3 (4 fichiers)
+
+| Chemin | Ce qui change |
+|---|---|
+| `src/app/shared/services/track.service.ts` | ajoute `validate(file)` + les constantes `MAX_AUDIO_SIZE` et `ALLOWED_AUDIO_TYPES`, recopiées du backend |
+| `src/app/components/tracks-page/tracks-page.ts` | contrôle du fichier avant envoi, états `uploading` / `uploadError` / `uploadSuccess`, piste en cours de lecture, erreur audio, révocation de l'`ObjectURL` à la destruction, formatage taille et type |
+| `src/app/components/tracks-page/tracks-page.html` | cards accessibles (titre, nom d'origine, format, taille, date, bouton Lire), états d'envoi, lecteur avec le titre en cours |
+| `src/app/components/tracks-page/tracks-page.css` | grille de cards responsive, mise en avant de la piste jouée, styles de focus |
+
+`track.service.ts` : `list(page, limit)` et le `FormData` (`audio` + `title`) étaient déjà
+corrects, seule la validation a été ajoutée.
 
 ---
 
@@ -52,6 +61,25 @@ deux paramètres.
 - **Changer la taille de page** remet la page à 1, sinon on pourrait demander une page qui n'existe plus.
 - **Coût de Material** : le bundle passe de 298 ko à 566 ko (79 → 132 ko transférés).
 
+**TP2 — où se trouve chaque étape** (question de la Mission 3)
+
+| Étape | Fichier et méthode |
+|---|---|
+| choix du fichier | `tracks-page.html` (`<input type="file">`) → `tracks-page.ts` `choose($event)` |
+| validation avant envoi | `track.service.ts` `validate(file)` |
+| construction du `FormData` | `track.service.ts` `upload()` — exactement `audio` et `title` |
+| appel HTTP d'upload | `track.service.ts` `http.post('/api/tracks', body)` |
+| ajout du JWT | `auth.interceptor.ts` |
+| récupération du `Blob` | `track.service.ts` `audio(id)` avec `responseType: 'blob'` |
+| création de l'`ObjectURL` | `tracks-page.ts` `play()` |
+| affectation au lecteur | `tracks-page.html` `<audio [src]="audioUrl()">` |
+| révocation | `releaseAudioUrl()` : avant chaque nouvelle lecture, et à la destruction du composant (`DestroyRef`) |
+| contrôles côté backend | `app.js` : `if (!req.file)` → 400, `fileFilter` (liste blanche MIME), `limits.fileSize` (25 Mo), `req.body.title` |
+
+- **Pourquoi valider côté front alors que le backend le fait déjà** : l'utilisateur est prévenu immédiatement, sans attendre l'envoi de 25 Mo. Mais ce contrôle est contournable (DevTools, appel direct à l'API) : **le serveur reste seul juge**.
+- **Pourquoi passer par un `Blob`** : une balise `<audio src="/api/...">` est chargée par le navigateur lui-même, hors de `HttpClient`. Aucun intercepteur ne s'exécute, donc **pas d'en-tête `Authorization`** → le backend répondrait `401`. On télécharge donc la piste avec `HttpClient`, puis on la donne au lecteur via une `ObjectURL`.
+- **Erreur de lecture** : avec `responseType: 'blob'`, le corps d'erreur est lui aussi un `Blob` — son message n'est pas lisible directement, on se fie au **statut** (404 = piste inconnue ou appartenant à un autre).
+
 ---
 
 ## 3. Vérifications déjà faites
@@ -67,6 +95,12 @@ deux paramètres.
 | API injoignable sur `/tracks` | ✅ « Chargement de la bibliothèque impossible » affiché |
 | Pagination (testée sur une fausse API de 12 pistes) | ✅ « Page suivante » → `page=2&limit=5` ; passage à 10 par page → `page=1&limit=10` |
 | Style du paginator | ✅ boutons Material ronds et transparents, pas écrasés par le vert du projet |
+| Fichier `.txt` choisi | ✅ « Format refusé (text/plain)… » **sans aucune requête réseau** |
+| Fichier audio de 26 Mo | ✅ « Fichier trop volumineux (26.0 Mo). Maximum : 25 Mo. » |
+| Envoi valide | ✅ message de succès, formulaire et champ fichier vidés, retour page 1, piste en tête de liste |
+| Champs multipart reçus | ✅ exactement `audio` et `title` |
+| Lecture | ✅ « Lecture en cours : … », card mise en avant, `src` en `blob:` |
+| Révocation de l'`ObjectURL` | ✅ URL accessible avant de quitter `/tracks`, inaccessible après |
 
 Restent à faire par le binôme, car ils demandent le mot de passe du compte démo : connexion
 réussie, modification du profil, upload.
@@ -94,6 +128,15 @@ Il faut **plus de 5 pistes** (en envoyer 6, ou passer `limit` à 2 le temps du t
 | Arrivée sur `/tracks` | `GET /api/tracks?page=1&limit=5` → `200` |
 | « Page suivante » | nouvelle requête avec `page=2` |
 | « Pistes par page » → 10 | nouvelle requête `page=1&limit=10` |
+
+### TP2 — upload et lecture
+
+| Action | Attendu |
+|---|---|
+| Envoi d'un MP3 | `POST /api/tracks` en **multipart**, onglet Payload : champs `audio` et `title` |
+| Envoi d'un fichier invalide | **aucune requête** : le message apparaît avant l'appel. Pour voir le `400` du serveur, contourner le contrôle (`accept` retiré dans les DevTools) ou envoyer un MP3 renommé |
+| Lecture | `GET /api/tracks/:id/audio` → `200`, type `audio/mpeg`, avec `Authorization` |
+| Piste d'un autre utilisateur | `404` (tester en modifiant l'id dans l'URL depuis un autre compte) |
 
 ### ⚠️ Avant toute capture d'écran
 
@@ -142,10 +185,49 @@ par le client, et n'écrit que le champ `name`.
 
 ---
 
-## 6. Reste à faire
+## 6. Réponses aux questions du TP2 (mémoire, buffering, streaming)
 
-- [ ] les captures Network des deux checkpoints ;
+**Le backend envoie-t-il le fichier entier en mémoire, ou progressivement depuis le disque ?**
+Progressivement. `res.sendFile()` ouvre un flux de lecture et pousse le fichier par morceaux ;
+il sait aussi répondre à l'en-tête `Range`, donc envoyer seulement une portion.
+
+**Avec `responseType: 'blob'`, quand le composant reçoit-il le fichier ?**
+À la fin, en une fois : le `next` du `subscribe` ne se déclenche qu'une fois le téléchargement
+**complet**. Il n'y a pas de lecture progressive, sauf à passer par
+`reportProgress: true` avec `observe: 'events'`.
+
+**Avec 100 morceaux, les 100 fichiers sont-ils chargés en mémoire à l'affichage de la liste ?**
+Non. `GET /api/tracks` ne renvoie que des **métadonnées JSON** (id, titre, taille, date). Le
+binaire n'est demandé que par `play()`, une piste à la fois, et l'`ObjectURL` précédente est
+révoquée. La liste est en plus paginée : 5 pistes affichées par défaut.
+
+**Quelle différence avec 100 `<audio>` pointant directement une URL HTTP ?**
+Le navigateur gérerait lui-même : avec `preload="metadata"` il ne récupère que l'en-tête du
+fichier, puis streame à la lecture par requêtes `Range`, ce qui permet de se déplacer dans la
+piste sans tout télécharger. Mais ces requêtes sont émises **par le navigateur**, hors de
+`HttpClient` : pas d'intercepteur, donc pas de jeton, donc `401`.
+
+**Pourquoi révoquer l'URL créée par `createObjectURL` ?**
+Cette URL maintient une référence au `Blob` : tant qu'elle existe, le fichier reste en mémoire,
+même si plus rien ne l'affiche. Sans révocation, chaque lecture laisserait jusqu'à 25 Mo
+derrière elle. `revokeObjectURL()` casse le lien et laisse le ramasse-miettes libérer la place.
+
+**Les trois notions à ne pas confondre**
+
+| | Ce que c'est | Conséquence |
+|---|---|---|
+| Téléchargement complet (`Blob`) | tout le fichier arrive avant la première note | simple et authentifié, mais latence et mémoire proportionnelles à la taille |
+| Buffering du navigateur | le navigateur télécharge un peu d'avance, joue, continue | lecture immédiate, mémoire bornée |
+| Streaming côté serveur | le serveur envoie par morceaux et répond aux requêtes `Range` | permet le déplacement dans la piste sans tout envoyer |
+
+C'est notre choix actuel : le `Blob` pour rester authentifié, au prix d'un téléchargement
+complet avant lecture.
+
+---
+
+## 7. Reste à faire
+
+- [ ] les captures Network des checkpoints TP1 et TP2 ;
 - [ ] joindre le schéma du flux de connexion (`flux-connexion.png` / `.svg`) ;
 - [ ] compléter `RAPPORT_IA_MODELE.md` (prompts, vérifications du binôme, preuves) ;
-- [ ] **TP2 Mission 3** : upload et lecture audio — validation du fichier avant envoi, états d'envoi, cards, révocation de l'`ObjectURL` à la destruction du composant, questions mémoire/buffering/streaming ;
-- [ ] corriger l'affichage de la taille : le template affiche `Ko` alors que l'API renvoie des **octets** (Mission 3).
+- [ ] options facultatives du TP2, si le temps le permet : barre de progression de l'upload, suppression via `DELETE /api/tracks/:id`, filtre par titre, image de couverture.

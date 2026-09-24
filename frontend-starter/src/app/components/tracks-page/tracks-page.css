@@ -1,5 +1,71 @@
 :host { display: block; }
 
+.hint {
+  margin: 0.2rem 0 0;
+  color: #61756f;
+  font-size: 0.8rem;
+}
+
+.success { color: #1d755e; }
+
+/* Liste de cards : une colonne sur mobile, deux dès qu'il y a la place. */
+.tracks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.8rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.track-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  height: 100%;
+  padding: 0.9rem;
+  background: #f7faf9;
+  border: 1px solid #e1ebe7;
+  border-radius: 12px;
+}
+
+.track-card.playing {
+  background: #eaf4f0;
+  border-color: #1d755e;
+}
+
+.track-card h3 {
+  margin: 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.track-card .meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.6rem;
+  margin: 0;
+  color: #61756f;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.track-card button { margin-top: auto; }
+
+.track-card button:focus-visible,
+.player audio:focus-visible {
+  outline: 3px solid #123d32;
+  outline-offset: 2px;
+}
+
+.player {
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid #e1ebe7;
+}
+
+.player p { margin: 0 0 0.4rem; }
+
 /* Le style global des boutons (vert, arrondi) ne doit pas écraser ceux du paginator. */
 mat-paginator button {
   padding: 0;
