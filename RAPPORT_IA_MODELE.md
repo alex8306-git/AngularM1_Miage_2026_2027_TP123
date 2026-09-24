@@ -49,3 +49,5 @@ rajoute un fichier le backend .md, met des schemas pour mieux comprendre
 pour les points c'est normal qu'il y a que du front, la racine c'est pas dans le server (back)?
 
 fais la mission 1 jusqu'au checkpoint, fabrique un fichier avec le changement que tu dois faire, le ou les chemins du fichier modifie et reponds en dessous aux questions (appelle le fichier, td_ia)
+
+passons au td2, et à la mission 2 (avec aussi le paginator material), rajoute les modifications que tu feras dans td_ia

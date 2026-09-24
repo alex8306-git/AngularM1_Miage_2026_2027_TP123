@@ -1,20 +1,27 @@
 import { Component, inject, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { Track } from '../../shared/models/track.model';
 import { TrackService } from '../../shared/services/track.service';
 
 @Component({
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, MatPaginatorModule],
   templateUrl: './tracks-page.html',
   styleUrl: './tracks-page.css',
 })
 export class TracksPageComponent {
   private readonly service = inject(TrackService);
 
+  // État de la bibliothèque paginée. La pagination est faite par le serveur :
+  // chaque changement de page déclenche un nouvel appel HTTP.
   readonly tracks = signal<Track[]>([]);
   readonly page = signal(1);
   readonly pages = signal(1);
+  readonly total = signal(0);
+  readonly limit = signal(5);
   readonly loading = signal(false);
+  readonly error = signal('');
   readonly audioUrl = signal('');
   readonly title = new FormControl('', { nonNullable: true });
   file?: File;
@@ -30,23 +37,50 @@ export class TracksPageComponent {
 
   load(): void {
     this.loading.set(true);
-    this.service.list(this.page()).subscribe({
+    this.error.set('');
+
+    this.service.list(this.page(), this.limit()).subscribe({
       next: (response) => {
-        console.debug('[TracksPage] Pistes chargées', response.items.length);
+        console.debug(
+          `[TracksPage] Page ${response.page}/${response.pages} chargée, ${response.items.length} piste(s) sur ${response.total}`,
+        );
         this.tracks.set(response.items);
         this.pages.set(response.pages);
+        this.total.set(response.total);
+        // Le serveur borne lui-même la page et la taille demandées : on garde ses valeurs.
+        this.page.set(response.page);
+        this.limit.set(response.limit);
         this.loading.set(false);
       },
-      error: (error) => {
-        console.error('[TracksPage] Chargement impossible', error);
+      error: (error: HttpErrorResponse) => {
+        console.error('[TracksPage] Chargement impossible', error.status);
+        this.error.set(error.error?.message ?? 'Chargement de la bibliothèque impossible');
         this.loading.set(false);
       },
     });
   }
 
   go(page: number): void {
+    // Garde-fous : pas de page hors bornes, pas de requête pendant un chargement.
+    if (this.loading() || page < 1 || page > this.pages() || page === this.page()) return;
+
     this.page.set(page);
     this.load();
+  }
+
+  /**
+   * Événement du paginator Material. Son pageIndex commence à 0 alors que l'API
+   * numérote les pages à partir de 1, d'où le décalage.
+   */
+  onPage(event: PageEvent): void {
+    if (event.pageSize !== this.limit()) {
+      this.limit.set(event.pageSize);
+      this.page.set(1);
+      this.load();
+      return;
+    }
+
+    this.go(event.pageIndex + 1);
   }
 
   upload(): void {

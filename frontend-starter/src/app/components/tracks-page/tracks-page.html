@@ -16,10 +16,13 @@
     <article class="card">
       <div class="row">
         <h2>Mes pistes</h2>
-        <button type="button" (click)="load()">Actualiser</button>
+        <button type="button" (click)="load()" [disabled]="loading()">Actualiser</button>
       </div>
       @if (loading()) {
-        <p>Chargement…</p>
+        <p role="status">Chargement…</p>
+      }
+      @if (error()) {
+        <p class="error" role="alert">{{ error() }}</p>
       }
       @for (track of tracks(); track track.id) {
         <div class="track">
@@ -32,11 +35,16 @@
       } @empty {
         <p>Aucune piste.</p>
       }
-      <div class="pager">
-        <button type="button" (click)="go(page() - 1)" [disabled]="page() === 1">Préc.</button>
-        <span>Page {{ page() }} / {{ pages() }}</span>
-        <button type="button" (click)="go(page() + 1)" [disabled]="page() === pages()">Suiv.</button>
-      </div>
+      <mat-paginator
+        [length]="total()"
+        [pageSize]="limit()"
+        [pageIndex]="page() - 1"
+        [pageSizeOptions]="[5, 10, 20]"
+        [disabled]="loading()"
+        (page)="onPage($event)"
+        aria-label="Pagination de la bibliothèque"
+      />
+      <p class="pager-state" aria-live="polite">Page {{ page() }} / {{ pages() }}</p>
       @if (audioUrl()) {
         <audio [src]="audioUrl()" controls autoplay></audio>
       }
