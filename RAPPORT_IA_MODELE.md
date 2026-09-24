@@ -39,7 +39,13 @@ Comment limiter le nombre d'uploads (quota, rate limiting) ?
 C'est quoi try/catch avec async/await et pourquoi c'est important dans les routes Express ?
 C'est quoi un middleware de gestion d'erreurs global en Express ?
 
+est ce que le jwt passe par la fonction de hash?
+c'est quoi les fichiers .ts?
 
 analyse le backend, je veux comprendre l'architecture, les workflows, les technologies et les modules utilisés, comment est géré l'authentification... et fais une phrase pour dire ce que c'est avant d'expliquer (c'est quoi un workflow...)
 à la fin, rajoute les améliorations possibles et pourquoi
 rajoute un fichier le backend .md, met des schemas pour mieux comprendre
+
+pour les points c'est normal qu'il y a que du front, la racine c'est pas dans le server (back)?
+
+fais la mission 1 jusqu'au checkpoint, fabrique un fichier avec le changement que tu dois faire, le ou les chemins du fichier modifie et reponds en dessous aux questions (appelle le fichier, td_ia)
