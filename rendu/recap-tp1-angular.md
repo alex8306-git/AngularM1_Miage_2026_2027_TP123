@@ -619,3 +619,94 @@ Pour un premier TP, des `try/catch` locaux suffisent — le middleware global es
 - Faille XSS concrètement, avec exemple
 - Bien utiliser un assistant IA pour ce TP (`CONSEILS_POUR_UTILISER_ASSISTANT_AI.md`)
 - Déboguer quand Postman marche mais pas Angular
+
+
+
+
+
+
+
+
+## Le principe en une phrase
+
+Le **frontend** montre et récolte, le **backend** vérifie et conserve. Ils ne se parlent que par des requêtes HTTP, et le backend ne fait jamais confiance au frontend.
+
+---
+
+## Le backend — `backend/` (Node + Express)
+
+Son rôle : **garder les données, appliquer les règles.** C'est le seul à toucher la base et les fichiers.
+
+| Fichier | À quoi il sert |
+|---|---|
+| `src/server.js` | Le démarrage : lit `.env`, se connecte à MongoDB, crée le compte démo, ouvre le port 3000. Si la base ne répond pas, il refuse de démarrer. |
+| `src/app.js` | Le cœur : la liste des routes (`/api/auth/login`, `/api/tracks`…) et les middlewares qu'elles traversent. |
+| ↳ middleware `auth` | Le videur : vérifie le jeton JWT et sait **qui** parle. Sans lui, pas d'accès aux routes protégées. |
+| ↳ Multer | Reçoit les fichiers audio : contrôle le format, coupe à 25 Mo, écrit sur le disque sous un nom aléatoire. |
+| ↳ gestionnaire d'erreurs | Transforme les pannes en réponses HTTP propres (400, 404…). |
+| `src/models/User.js` | La forme d'un utilisateur + le hachage bcrypt du mot de passe + `toPublic()` qui filtre ce qui a le droit de sortir. |
+| `src/models/Track.js` | La forme d'une piste : titre, taille, format, **propriétaire**. |
+| `.env` | Les secrets : adresse MongoDB, clé de signature des jetons. Jamais dans Git. |
+
+**Ce qu'il stocke où :** MongoDB garde les comptes et les *fiches* des pistes. Les fichiers audio eux-mêmes restent sur le disque du serveur, dans `data/uploads/`.
+
+---
+
+## Le frontend — `frontend-starter/` (Angular)
+
+Son rôle : **afficher, réagir aux clics, appeler l'API.** Il ne décide de rien d'important.
+
+| Fichier | À quoi il sert |
+|---|---|
+| `src/main.ts` | Le démarrage : lance Angular et branche le routeur, HttpClient et les intercepteurs. |
+| `app/routes.ts` | La table URL → écran : `/login`, `/register`, `/profile`, `/tracks`. |
+| `app/components/app/` | La coquille : en-tête, navigation, bouton Déconnexion, et l'emplacement où s'affiche l'écran courant. |
+| `app/components/*-page/` | Les quatre écrans. Ils lisent les formulaires, affichent les résultats et les erreurs — rien de plus. |
+| `app/shared/services/auth.service.ts` | Tout ce qui touche au compte : connexion, inscription, profil, jeton. C'est lui qui garde l'état « qui est connecté ». |
+| `app/shared/services/track.service.ts` | Tout ce qui touche aux pistes : liste paginée, upload, téléchargement audio, validation du fichier. |
+| `app/shared/interceptors/auth.interceptor.ts` | Ajoute `Authorization: Bearer …` à **toutes** les requêtes, automatiquement. |
+| `app/shared/interceptors/error.interceptor.ts` | Écoute les réponses : sur un `401`, déconnecte et renvoie sur `/login`. |
+| `app/shared/guards/auth.guard.ts` | Empêche d'ouvrir `/profile` et `/tracks` sans jeton. Confort d'affichage, pas sécurité. |
+| `app/shared/models/` | La forme des données attendues (`User`, `Track`…), vérifiée à la compilation. |
+| `proxy.conf.json` | En développement, fait suivre `/api` du port 4200 vers le 3000. |
+
+---
+
+## Le schéma
+
+```
+┌──────────────────── NAVIGATEUR — localhost:4200 ─────────────────────┐
+│                                                                      │
+│   app.ts / app.html      en-tête + navigation + <router-outlet>      │
+│          │                                                           │
+│   routes.ts ──► login · register · profile · tracks   (les écrans)   │
+│          │                                                           │
+│   auth.guard.ts ─ bloque /profile et /tracks sans jeton              │
+│          │                                                           │
+│          ▼                                                           │
+│   auth.service.ts            track.service.ts                        │
+│   (compte, jeton)            (pistes, upload, audio)                 │
+│          │                          │                                │
+│          └──────────┬───────────────┘                                │
+│                     ▼                                                │
+│                HttpClient                                            │
+│      auth.interceptor  ──► ajoute le jeton (aller)                   │
+│      error.interceptor ◄── traite le 401    (retour)                 │
+└─────────────────────┬────────────────────────────────────────────────┘
+                      │   /api/...   JSON ou fichier
+                      │   proxy.conf.json : 4200 ──► 3000
+                      ▼
+┌──────────────────── SERVEUR — localhost:3000 ────────────────────────┐
+│                                                                      │
+│   server.js    démarre, lit .env, se connecte à MongoDB              │
+│                                                                      │
+│   app.js       logger → cors → json → [auth] → [multer] → route      │
+│                                         │         │                  │
+│                              vérifie le jeton   reçoit le fichier    │
+│                                                                      │
+│   models/User.js · models/Track.js   validation, bcrypt, toPublic()  │
+└──────────────┬──────────────────────────────┬────────────────────────┘
+               ▼                              ▼
+     MongoDB Atlas (cloud)            data/uploads/ (disque)
+     comptes + fiches des pistes      les fichiers audio
+```
